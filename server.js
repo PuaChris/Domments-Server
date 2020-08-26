@@ -1,15 +1,39 @@
+const admin = require('firebase-admin');
+// require('firebase/firestore';
+// const firestore = require('firebase');
 const express = require('express');
+const FirestoreHelper = require('./firestore-helper');
 
+require('dotenv').config();
+
+
+
+// https://stackoverflow.com/questions/41287108/deploying-firebase-app-with-service-account-to-heroku-environment-variables-wit
+// Someone said that some environments might have troubles with newlines in the `private_key` env var and put up a solution for it
+admin.initializeApp({
+  credential: admin.credential.cert({
+    "project_id": process.env.FIREBASE_PROJECT_ID,
+    "private_key": process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    "client_email": process.env.FIREBASE_CLIENT_EMAIL,
+  }),
+  databaseURL: 'https://domments.firebaseio.com'
+});
+
+const db = admin.firestore();
 const server = express();
 
-// Express' static middle ware to use static files (HTML, CSS and JS) from the directory specified -> In this case, the folder is called "public"
-server.use(express.static("public"));
 
-server.get("/", (req, res) => {
-  res.send("Hello, World!");
+
+// Express' static middle ware to use static files (HTML, CSS and JS) from the directory specified -> In this case, the folder is called "public"
+// server.use(express.static("public"));
+
+server.get("/user", (req, res) => {
+  let userData = FirestoreHelper.initializeDb(db);
+  
+  console.log(req.url);
+  res.send(userData);
 })
 
-server.listen(process.env.PORT || 4000,
-  () => console.log("Server is running at http://localhost:4000/")
-);
+const PORT = 4000;
+server.listen(PORT, () => console.log("Server is running at http://localhost:4000/"));
 
