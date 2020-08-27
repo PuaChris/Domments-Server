@@ -22,16 +22,38 @@ admin.initializeApp({
 const db = admin.firestore();
 const server = express();
 
+server.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  next();
+})
 
-
-// Express' static middle ware to use static files (HTML, CSS and JS) from the directory specified -> In this case, the folder is called "public"
-// server.use(express.static("public"));
+server.get("/", (req, res) => {
+  res.send("Hello world!");
+})
 
 server.get("/user", (req, res) => {
-  let userData = FirestoreHelper.initializeDb(db);
+  FirestoreHelper.initializeDb(db)
+  .then((userData) => {
+    res.json(userData);
+  });
+})
+
+server.get("/comments", (req, res) => {
+  console.log("Retrieving comments...");
+
+  const userData = { userId: req.query.userId, userName: req.query.userName };
+  const website = req.query.website;
   
-  console.log(req.url);
-  res.send(userData);
+  FirestoreHelper.getComments(db, userData, website)
+  .then((commentList) => {
+    console.log(commentList);
+    res.send(commentList);
+    console.log("Retrieved " + commentList.length + " comments.");
+  })
+})
+
+server.get("/comments", (req, res) => {
+  
 })
 
 const PORT = 4000;
