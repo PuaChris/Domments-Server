@@ -1,7 +1,6 @@
 const admin = require('firebase-admin');
-// require('firebase/firestore';
-// const firestore = require('firebase');
 const express = require('express');
+const cors = require('cors');
 const FirestoreHelper = require('./firestore-helper');
 
 require('dotenv').config();
@@ -22,6 +21,7 @@ admin.initializeApp({
 const db = admin.firestore();
 const server = express();
 
+// To bypass the "Same Origin" security policy to prevent cross-browser origin risks
 server.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   next();
@@ -31,29 +31,93 @@ server.get("/", (req, res) => {
   res.send("Hello world!");
 })
 
-server.get("/user", (req, res) => {
-  FirestoreHelper.initializeDb(db)
+server.get('/users/:userId', (req, res) => {
+  const userId = req.params.userId;
+  FirestoreHelper.initializeDb(db, userId)
   .then((userData) => {
+    console.log("Database successfully initialized. \n");
     res.json(userData);
+  })
+  .catch((error) => {
+    console.error("Error initializing database -> " + error + "\n");
   });
 })
 
-server.get("/comments", (req, res) => {
+// ? Is it because this route endpoint gets hit first and since there's no website param, it fails?
+server.get('/users/:userId/website/:website/comments', (req, res) => {
   console.log("Retrieving comments...");
-
-  const userData = { userId: req.query.userId, userName: req.query.userName };
-  const website = req.query.website;
+  
+  const website = req.params.website;
+  const userData = { 
+    userDocId: req.query.userDocId, 
+    userId: req.params.userId, 
+    userName: req.query.userName 
+  };
   
   FirestoreHelper.getComments(db, userData, website)
   .then((commentList) => {
     console.log(commentList);
+    console.log("Retrieved " + commentList.length + " comment(s).\n");
     res.send(commentList);
-    console.log("Retrieved " + commentList.length + " comments.");
+  })
+  .catch((error) => {
+    console.error("Error retriving comments -> " + error + "\n");
+  });
+})
+
+server.get('/users/:userId/website/:website/comments/newid', (req, res) => {
+  console.log("Generating new comment ID...");
+  const website = req.query.website;
+  const userData = { 
+    userDocId: req.query.userDocId, 
+    userId: req.params.userId,
+  };
+  FirestoreHelper.getNewCommentId(db, userData, website)
+  .then((newCommentId) => {
+    res.json(newCommentId);
+    console.log("New comment ID " + newCommentId + " successfully generated.\n");
   })
 })
 
-server.get("/comments", (req, res) => {
-  
+// Adding or modifying comment
+server.post('/users/:userId/website/:website/comments/:commentId', (req, res) => {
+  console.log("Saving comment...");
+  const commentId = req.params.commentId;
+  const userData = {
+    userDocId: req.query.userDocId,
+    userId: req.params.userId,
+    userName: req.query.userName
+  };
+  const website = req.params.website;
+  const message = req.query.message;
+
+  FirestoreHelper.saveComment(db, userData, website, commentId, message)
+  .then((commentData) => {
+    console.log("Successfully saved new comment.\n")
+    res.json(commentData);
+  })
+  .catch((error) => {
+    console.error("Error saving comment -> " + error + "\n");
+  });
+})
+
+server.options('/users/:userId/website/:website/comments/:commentId', cors());
+server.delete('/users/:userId/website/:website/comments/:commentId', cors(), (req, res) => {
+  console.log("Deleting comment...");
+  const commentId = req.params.commentId;
+  const userData = { 
+    userDocId: req.query.userDocId, 
+    userId: req.params.userId, 
+  };
+  const website = req.params.website;
+  FirestoreHelper.deleteComment(db, userData, website, commentId)
+  .then(() => {
+    console.log("Comment " + commentId + " successfully deleted.\n");
+    res.sendStatus(200);
+  })
+  .catch((error) => {
+    console.error("Error saving comment -> " + error + "\n");
+  });
 })
 
 const PORT = 4000;
