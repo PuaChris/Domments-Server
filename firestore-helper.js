@@ -5,12 +5,11 @@ const firestore = require('@google-cloud/firestore');
 async function initializeDb(db, userId) {
   // Checking to see if user exists and getting their ID to be used for referencing when adding a new comment
   const users = db.collection("users");
-  // const website = this.websiteRootUrl;
-  const website = "test.com";
 
   const userDocId = await getUser(users, userId)
     .catch((error) => {
-      console.error("Error in trying to get current user's Document reference: " + error);
+      console.error(`Error in getting current user's Document reference -> ${error}`);
+      return null;
     });
 
   // Check user's collection of websites 
@@ -18,38 +17,40 @@ async function initializeDb(db, userId) {
     let userDocRef = users.doc(userDocId);
     let userDocData = (await userDocRef.get()).data();
 
-    let websiteCollection = userDocRef.collection("websites");
-
-    let querySnapshot = await websiteCollection.doc(website).get()
-      .catch((error) => {
-        console.error("Error in getting website document: " + error);
-      });
-
-    if (querySnapshot.empty) {
-      console.log("User has no comments for " + website);
-    }
-
     return { userDocId, userDocData };
   }
   else {
-    console.log("User does not exist");
-    return null;
+    console.error(`Error in retriving user data.`);
   }
 }
 
 // Retriving Document ID of current user
 async function getUser(users, userId) {
   let docId = null;
-  let querySnapshot = await users.where("userid", "==", userId)
-    .get()
+  let querySnapshot = await users.where("userId", "==", userId).get()
     .catch(function(error) {
-      console.error("Error getting documents: ", error);
+      console.error(`Error in searching for user in database -> ${error}`);
     });
 
   // Should only return one user
-  querySnapshot.forEach((doc) => {
-    docId = doc.id;
-  });
+  if (!querySnapshot.empty){
+    querySnapshot.forEach(doc => {
+      docId = doc.id;
+      console.log()
+      return docId;
+    });
+
+  }
+  else {
+    // Creating new user
+    const newUserDoc = await users.add({
+      userId: userId,
+      userName: userId,
+    });
+
+    docId = newUserDoc.id;
+    console.log(`New user created: ${userId}`);
+  }
 
   return docId;
 }
@@ -58,9 +59,8 @@ async function getComments(db, userData, website) {
   // Checks which website they are on and pull comments 
   let commentList = [];
   const users = db.collection("users");
-  const userDocId = await getUser(users, userData.userId);
 
-  let allCommentsFromDb = await users.doc(userDocId)
+  let allCommentsFromDb = await users.doc(userData.userDocId)
     .collection("websites")
     .doc(website)
     .collection("comments")
@@ -93,14 +93,6 @@ async function getNewCommentId(db, userData, website) {
     .doc().id;
   return commentId;
 }
-/*
-1. User has a comment they want to save. It is stored in 'message' hook. 
-2. User presses 'Comment' button. handleSubmit() is called. 
-3. saveComment() is passed down from CommentList.js -> Comment.js so it can be called inside handleSubmit()
-4. saveComment() takes in the Comment ID and message (so we know which Comment we're saving the message too)
-5. We already checked for the user auth upon start up just add the user's name as the commenter
-* 6. Inside saveComment(), it's going to save the ID, message, user, and timestamp as a comment *
-*/
 
 async function saveComment(db, userData, website, commentId, message) {
   if (message) {
@@ -121,20 +113,19 @@ async function saveComment(db, userData, website, commentId, message) {
         timestamp: currentTimestamp
       })
       .catch((error) => {
-        console.error("Error in adding new comment: " + error);
+        console.error(`Error in adding new comment: ${error}`);
         return false;
       });
     return { commentId: commentId, timestamp: currentTimestamp.toMillis() } ;
   }
   else {
-    console.log("No message to be saved.");
+    console.log(`No message to be saved.`);
     return false;
   }
 }
 
 async function deleteComment(db, userData, website, commentId) {
   const users = db.collection("users");
-  const userDocId = await getUser(users, userData.userId);
 
   let commentRef = await users.doc(userData.userDocId)
     .collection("websites")
@@ -143,18 +134,18 @@ async function deleteComment(db, userData, website, commentId) {
     .doc(commentId)
     .get()
     .catch((error) => {
-      console.error("Error in retrieving document to be deleted: " + error);
+      console.error(`Error in retrieving document to be deleted -> ${error}`);
     });
     
   if (commentRef) {
-    await users.doc(userDocId)
+    await users.doc(userData.userDocId)
       .collection("websites")
       .doc(website)
       .collection("comments")
       .doc(commentId)
       .delete()
       .catch((error) => {
-        console.error("Error in deleting document from database: " + error);
+        console.error(`Error in deleting document from database -> ${error}`);
       });
   }
 }
