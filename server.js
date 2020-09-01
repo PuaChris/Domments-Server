@@ -124,5 +124,5 @@ server.delete('/users/:userId/website/:website/comments/:commentId', cors(), (re
 })
 
 const PORT = 4000;
-server.listen(PORT, () => console.log(`Server is running at http://localhost:4000/\n`));
+server.listen(process.env.PORT || PORT, () => console.log(`Server is running at ${process.env.PORT}\n`));
 
